@@ -8,7 +8,9 @@ _MARGIN = 2 * cm
 _HEADER_FONT = ("Helvetica-Bold", 11)
 _BODY_FONT = ("Helvetica", 10)
 _BODY_LEADING = 14
-_HEADER_SPACE_ABOVE = 2
+_HEADER_SPACE_ABOVE = 10
+_HEADER_RULE_GAP = 5
+_HEADER_BODY_GAP = 13
 _BLANK_SPACER = 4
 
 
@@ -61,13 +63,13 @@ def export_pdf(cv_text: str, output_path: str) -> None:
 
             if _is_header(line):
                 y -= _HEADER_SPACE_ABOVE
-                new_page_if_needed(_HEADER_FONT[1] + 6)
+                new_page_if_needed(_HEADER_FONT[1] + _HEADER_RULE_GAP + _HEADER_BODY_GAP)
                 c.setFont(*_HEADER_FONT)
                 c.drawString(_MARGIN, y, line.strip())
-                y -= _HEADER_FONT[1] + 2
-                c.setLineWidth(1)
+                y -= _HEADER_RULE_GAP
+                c.setLineWidth(0.75)
                 c.line(_MARGIN, y, _MARGIN + content_width, y)
-                y -= 6
+                y -= _HEADER_BODY_GAP
             else:
                 for wrapped in _wrap(c, line, _BODY_FONT[0], _BODY_FONT[1], content_width):
                     new_page_if_needed(_BODY_LEADING)

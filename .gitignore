@@ -3,9 +3,9 @@
 *.env
 !.env.example
 
-# CVmate generated artifacts
-test_output.pdf
-tailored_cv_*.pdf
+# CVmate generated artifacts (root only — showcase/ outputs are committed)
+/test_output.pdf
+/tailored_cv_*.pdf
 
 # Python
 __pycache__/

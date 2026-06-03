@@ -12,6 +12,20 @@ leaves your machine is the CV text and job description sent to the Gemini API on
 
 ---
 
+## Screenshots
+
+| Attach a CV + paste the job | Tailored result, ready to download |
+|---|---|
+| ![App](showcase/02_cv_attached.png) | ![Done](showcase/05_done.png) |
+
+The exported PDF, reordered to lead with the most job-relevant experience:
+
+![Output PDF](showcase/07_output_pdf.png)
+
+A full step-by-step walkthrough is in [showcase/SHOWCASE.md](showcase/SHOWCASE.md).
+
+---
+
 ## Features
 
 - **Attach CV (PDF)** — extracts text from text-based PDFs (`pdfplumber`).
