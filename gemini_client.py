@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from config import GEMINI_MODEL
 
-load_dotenv()
+load_dotenv(override=True)
 
 _API_KEY = os.getenv("GEMINI_API_KEY")
 if not _API_KEY:

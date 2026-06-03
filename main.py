@@ -5,7 +5,7 @@ from tkinter import messagebox
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 try:
     import gemini_client  # noqa: F401  triggers EnvironmentError if key missing
