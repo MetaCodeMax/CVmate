@@ -1,3 +1,4 @@
 GEMINI_MODEL = "gemini-flash-latest"
 APP_TITLE = "CVmate"
 WINDOW_SIZE = "720x600"
+AI_STUDIO_URL = "https://aistudio.google.com/apikey"

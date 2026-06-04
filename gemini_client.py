@@ -1,20 +1,29 @@
 """Gemini API wrapper: prompt builder and tailored CV generation."""
 
-import os
-
 import google.generativeai as genai
-from dotenv import load_dotenv
 
 from config import GEMINI_MODEL
 
-load_dotenv(override=True)
+_model = None
 
-_API_KEY = os.getenv("GEMINI_API_KEY")
-if not _API_KEY:
-    raise EnvironmentError("GEMINI_API_KEY not found in .env. See .env.example.")
 
-genai.configure(api_key=_API_KEY)
-_model = genai.GenerativeModel(GEMINI_MODEL)
+def configure(api_key: str) -> None:
+    genai.configure(api_key=api_key)
+    global _model
+    _model = genai.GenerativeModel(GEMINI_MODEL)
+
+
+def is_configured() -> bool:
+    return _model is not None
+
+
+def validate_api_key(api_key: str) -> bool:
+    try:
+        genai.configure(api_key=api_key)
+        next(iter(genai.list_models()))
+        return True
+    except Exception:
+        return False
 
 
 def build_prompt(cv_text: str, job_description: str) -> str:
@@ -41,12 +50,20 @@ Rewrite the CV above to best match the job description. Follow these rules:
 
 
 def generate_tailored_cv(cv_text: str, job_description: str) -> str:
+    if _model is None:
+        raise RuntimeError("Gemini API key not configured. Call configure() first.")
     prompt = build_prompt(cv_text, job_description)
     response = _model.generate_content(prompt)
     return response.text
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    import env_store
+
+    load_dotenv(override=True)
+    configure(env_store.get_api_key())
     sample_cv = (
         "JANE DOE\n"
         "SUMMARY\nBackend engineer with 6 years of Python experience.\n"

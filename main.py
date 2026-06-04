@@ -1,17 +1,8 @@
-"""Entry point for CVmate. Verifies the API key, then launches the GUI."""
-
-import sys
-from tkinter import messagebox
+"""Entry point for CVmate. Loads the dev .env, then launches the GUI."""
 
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
-
-try:
-    import gemini_client  # noqa: F401  triggers EnvironmentError if key missing
-except EnvironmentError as e:
-    messagebox.showerror("CVmate — Configuration Error", str(e))
-    sys.exit(1)
 
 import gui
 

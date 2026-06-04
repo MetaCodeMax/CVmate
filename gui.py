@@ -3,15 +3,23 @@
 import os
 import queue
 import threading
+import webbrowser
 from datetime import datetime
 from tkinter import filedialog
 
 import customtkinter as ctk
 
 import cv_parser
+import env_store
 import gemini_client
 import pdf_exporter
-from config import APP_TITLE, WINDOW_SIZE
+from config import AI_STUDIO_URL, APP_TITLE, WINDOW_SIZE
+
+_KEY_COLORS = {
+    "grey": ("gray40", "gray30"),
+    "green": ("#2e7d32", "#1b5e20"),
+    "red": ("#c62828", "#8e0000"),
+}
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -32,14 +40,22 @@ class App(ctk.CTk):
 
         self._build_layout()
         self.after(100, self._poll_result_queue)
+        self.after(200, self._init_api_key)
 
     def _build_layout(self):
         container = ctk.CTkFrame(self, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
 
+        header_row = ctk.CTkFrame(container, fg_color="transparent")
+        header_row.pack(fill="x")
         ctk.CTkLabel(
-            container, text=APP_TITLE, font=ctk.CTkFont(size=28, weight="bold")
-        ).pack(anchor="w")
+            header_row, text=APP_TITLE, font=ctk.CTkFont(size=28, weight="bold")
+        ).pack(side="left")
+        self.apikey_button = ctk.CTkButton(
+            header_row, text="API Key", width=110, command=self._prompt_api_key
+        )
+        self.apikey_button.pack(side="right")
+        self._set_key_state("grey")
 
         attach_row = ctk.CTkFrame(container, fg_color="transparent")
         attach_row.pack(fill="x", pady=(16, 8))
@@ -85,6 +101,114 @@ class App(ctk.CTk):
         self.tailored_cv_text = ""
         self.download_button.configure(state="disabled", fg_color="gray30")
 
+    def _set_key_state(self, state):
+        fg, hover = _KEY_COLORS[state]
+        self.apikey_button.configure(fg_color=fg, hover_color=hover)
+
+    def _init_api_key(self):
+        key = env_store.get_api_key()
+        if not key:
+            self._set_key_state("grey")
+            self._set_status("Set your Gemini API key to start (top-right button).")
+            return
+        self._set_status("Checking saved API key…")
+        threading.Thread(target=self._check_saved_key, args=(key,), daemon=True).start()
+
+    def _check_saved_key(self, key):
+        ok = gemini_client.validate_api_key(key)
+        if ok:
+            gemini_client.configure(key)
+        self._result_queue.put(("keystate", ok))
+
+    def _on_saved_key_checked(self, ok):
+        if ok:
+            self._set_key_state("green")
+            self._set_status("Ready")
+        else:
+            self._set_key_state("red")
+            self._set_status("Saved API key didn't authenticate — click API Key to fix it.")
+
+    def _prompt_api_key(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Set up your Gemini API key")
+        dialog.geometry("540x380")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.after(250, dialog.grab_set)
+
+        frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=24, pady=24)
+
+        ctk.CTkLabel(
+            frame,
+            text="Connect your Gemini API key",
+            font=ctk.CTkFont(size=18, weight="bold"),
+        ).pack(anchor="w")
+
+        steps = (
+            "1.  Click below to open Google AI Studio.\n"
+            "2.  Sign in, press Create API key, and copy it.\n"
+            "3.  Paste it here and click Save & Continue."
+        )
+        ctk.CTkLabel(frame, text=steps, justify="left", anchor="w").pack(
+            anchor="w", pady=(8, 12)
+        )
+
+        ctk.CTkButton(
+            frame,
+            text="Open Google AI Studio  ↗",
+            command=lambda: webbrowser.open(AI_STUDIO_URL),
+        ).pack(fill="x")
+
+        entry = ctk.CTkEntry(frame, placeholder_text="Paste your API key here")
+        entry.pack(fill="x", pady=(16, 4))
+
+        status = ctk.CTkLabel(frame, text="", anchor="w", justify="left")
+        status.pack(fill="x")
+
+        save_btn = ctk.CTkButton(frame, text="Save & Continue")
+        save_btn.pack(fill="x", pady=(12, 0))
+
+        result_q = queue.Queue()
+
+        def poll():
+            try:
+                key, ok = result_q.get_nowait()
+            except queue.Empty:
+                dialog.after(100, poll)
+                return
+            if ok:
+                gemini_client.configure(key)
+                self._set_key_state("green")
+                self._set_status("API key saved and verified. Ready.")
+                dialog.destroy()
+            else:
+                self._set_key_state("red")
+                save_btn.configure(state="normal", text="Save & Continue")
+                status.configure(
+                    text="Saved, but that key didn't authenticate — check it and try again.",
+                    text_color="#e06666",
+                )
+
+        def on_save():
+            key = entry.get().strip()
+            if not key:
+                status.configure(text="Please paste your API key.", text_color="#e06666")
+                return
+            save_btn.configure(state="disabled", text="Checking…")
+            status.configure(text="Saving and validating…", text_color="gray70")
+
+            def worker():
+                env_store.save_api_key(key)
+                result_q.put((key, gemini_client.validate_api_key(key)))
+
+            threading.Thread(target=worker, daemon=True).start()
+            dialog.after(100, poll)
+
+        save_btn.configure(command=on_save)
+        entry.bind("<Return>", lambda _e: on_save())
+        entry.focus()
+
     def _on_job_edit(self, _event=None):
         if self.tailored_cv_text:
             self._reset_generation()
@@ -116,6 +240,10 @@ class App(ctk.CTk):
         if not job_desc:
             self._set_status("Please paste the job description.")
             return
+        if not gemini_client.is_configured():
+            self._set_status("Set a working Gemini API key to continue.")
+            self._prompt_api_key()
+            return
 
         self.generate_button.configure(state="disabled", text="Generating…")
         self.attach_button.configure(state="normal")
@@ -140,6 +268,8 @@ class App(ctk.CTk):
                 kind, payload = self._result_queue.get_nowait()
                 if kind == "success":
                     self._on_generate_success(payload)
+                elif kind == "keystate":
+                    self._on_saved_key_checked(payload)
                 else:
                     self._on_generate_error(payload)
         except queue.Empty:
