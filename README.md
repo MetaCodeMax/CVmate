@@ -26,6 +26,23 @@ A full step-by-step walkthrough is in [showcase/SHOWCASE.md](showcase/SHOWCASE.m
 
 ---
 
+## Quick start (no Python, no terminal)
+
+For most users — nothing to install:
+
+1. Go to the [**Releases**](https://github.com/MetaCodeMax/CVmate/releases) page and download **`CVmate.exe`**.
+2. Double-click it. (Windows SmartScreen may warn about an unknown publisher — click **More info → Run anyway**; the app is unsigned.)
+3. On first launch CVmate asks for a free Google Gemini API key:
+   - Click **Open Google AI Studio**, sign in, press **Create API key**, and copy it.
+   - Paste it into the box and click **Save & Continue**.
+   - The key is validated and stored locally at `%APPDATA%\CVmate\config.json` — you only do this once. (Change it any time via the **API Key** button.)
+4. Attach your CV, paste a job description, **Generate**, then **Download PDF**.
+
+> The key lives only on your machine. Nothing is uploaded except the CV text and
+> job description sent to Gemini when you click Generate.
+
+---
+
 ## Features
 
 - **Attach CV (PDF)** — extracts text from text-based PDFs (`pdfplumber`).
@@ -44,7 +61,7 @@ A full step-by-step walkthrough is in [showcase/SHOWCASE.md](showcase/SHOWCASE.m
 
 ---
 
-## Setup
+## Run from source (developers)
 
 ```powershell
 # 1. Clone
@@ -58,27 +75,41 @@ py -m venv .venv
 # 3. Install dependencies
 py -m pip install -r requirements.txt
 
-# 4. Configure your API key
-copy .env.example .env
-#    then open .env and set:
-#    GEMINI_API_KEY=your-real-key-here
+# 4. Run
+py main.py
 ```
 
 > The `py` launcher selects your Python 3.11+ interpreter. If `python` on your machine
 > points at the Microsoft Store stub, use `py` instead (as shown above).
 
+On first launch the app prompts for your Gemini API key in a window and saves it to
+`%APPDATA%\CVmate\config.json` — no `.env` editing required.
+
+> **Optional dev shortcut:** to skip the dialog, `copy .env.example .env` and set
+> `GEMINI_API_KEY=your-real-key-here`. A key in the environment or `.env` always takes
+> precedence over the saved config.
+
 ---
 
-## Running
+## Build the standalone .exe
+
+To produce a single-file `dist\CVmate.exe` that runs without Python installed:
 
 ```powershell
-py main.py
+.\build.bat
 ```
 
-On startup the app verifies your API key. If `GEMINI_API_KEY` is missing, you'll get a
-clear error dialog instead of a broken window.
+This installs [PyInstaller](https://pyinstaller.org/) and bundles everything per
+`CVmate.spec`. The resulting `dist\CVmate.exe` is fully self-contained — share that one
+file, or attach it to a [GitHub Release](https://github.com/MetaCodeMax/CVmate/releases):
 
-### Using it
+```powershell
+gh release create v1.0.0 dist\CVmate.exe --title "CVmate v1.0.0" --notes "Standalone Windows build."
+```
+
+---
+
+## Using the app
 
 1. Click **Attach CV (PDF)** and select a text-based PDF.
 2. Paste the job description into the text area.
@@ -91,14 +122,17 @@ clear error dialog instead of a broken window.
 
 ```
 CVmate/
-├── main.py            # Entry point: API-key startup guard, then launches the GUI
-├── gui.py             # CustomTkinter window + event handlers (App class)
+├── main.py            # Entry point: loads dev .env, then launches the GUI
+├── gui.py             # CustomTkinter window, first-run API-key dialog, handlers
 ├── cv_parser.py       # extract_text(), segment_sections()
-├── gemini_client.py   # build_prompt(), generate_tailored_cv()
+├── gemini_client.py   # configure(), validate_api_key(), build_prompt(), generate_tailored_cv()
+├── key_store.py       # Resolve/save the API key (%APPDATA%\CVmate\config.json)
 ├── pdf_exporter.py    # export_pdf()
-├── config.py          # GEMINI_MODEL, APP_TITLE, WINDOW_SIZE
-├── requirements.txt   # 5 dependencies
-├── .env.example       # Template — copy to .env and add your key
+├── config.py          # GEMINI_MODEL, APP_TITLE, WINDOW_SIZE, AI_STUDIO_URL
+├── requirements.txt   # 5 runtime dependencies
+├── build.bat          # One-click build → dist\CVmate.exe
+├── CVmate.spec        # PyInstaller bundle spec
+├── .env.example       # Optional dev template — copy to .env and add your key
 ├── PRD.md             # Product requirements
 └── MVP-PLAN.md        # Phase-by-phase build plan
 ```
@@ -119,14 +153,16 @@ py pdf_exporter.py
 `config.py` holds the model name and UI constants — change the Gemini model in one place:
 
 ```python
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-flash-latest"
 ```
 
 ---
 
 ## Security notes
 
-- **`.env` is gitignored** and must never be committed — it holds your API key.
+- Your API key is stored only on your machine — in `%APPDATA%\CVmate\config.json`
+  (entered via the in-app dialog) or in a developer `.env`. Neither is committed.
+- **`.env` is gitignored** and must never be committed.
 - `.env.example` is the committed template and contains only a placeholder.
 - If your key is ever exposed, revoke it at
   [Google AI Studio](https://aistudio.google.com/apikey) and generate a new one.

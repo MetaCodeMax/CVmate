@@ -2,21 +2,21 @@ ALEX MORGAN
 alex.morgan@email.com | +1 (555) 482-1190 | Boston, MA
 
 SUMMARY
-Software engineer with 7 years building web applications and internal tools. Comfortable across the stack but strongest on the backend. Has shipped products in Python, Java, and Node.js.
+Software engineer with 7 years of experience specializing in **backend** development and **Python**. Proven track record of designing and implementing **REST APIs**, working with **SQL** databases and **Docker**, and **mentoring junior engineers**. Comfortable building frontend reporting **dashboards** in **React** to support backend systems.
 
 EXPERIENCE
 Software Engineer — Northwind Retail (2019-2024)
-- Wrote Python scripts to reconcile inventory data nightly.
-- Mentored two junior engineers on code review practices.
-- Built internal reporting dashboards in React.
-- Maintained a Java/Spring order-management monolith.
+- Developed and maintained **Python** scripts to reconcile critical nightly inventory data across databases.
+- **Mentored junior engineers** on code review practices to improve overall code quality and team collaboration.
+- Built internal reporting **dashboards** in **React** to visualize complex data.
+- Maintained a Java/Spring **backend** order-management monolith.
 
 Junior Developer — Bluefin Software (2017-2019)
-- Implemented REST endpoints in Node.js and Express.
-- Added tests and fixed bugs in a legacy PHP codebase.
+- Implemented **REST APIs** and endpoints utilizing Node.js and Express.
+- Wrote **tests** and resolved bugs to improve reliability of a legacy PHP codebase.
 
 SKILLS
-Python, Docker, SQL, React, Node.js, Java, Spring, JavaScript, Git
+**Python**, **SQL**, **Docker**, **React**, Java, Spring, JavaScript, Node.js, Git
 
 EDUCATION
 BSc Computer Science — Northeastern University (2013-2017)

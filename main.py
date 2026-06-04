@@ -1,17 +1,13 @@
-"""Entry point for CVmate. Verifies the API key, then launches the GUI."""
+"""Entry point for CVmate.
 
-import sys
-from tkinter import messagebox
+Loads any developer .env, then launches the GUI. The Gemini API key is resolved
+at runtime by the GUI (from %APPDATA% or its first-run dialog), so a missing key
+no longer prevents the app from starting.
+"""
 
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
-
-try:
-    import gemini_client  # noqa: F401  triggers EnvironmentError if key missing
-except EnvironmentError as e:
-    messagebox.showerror("CVmate — Configuration Error", str(e))
-    sys.exit(1)
 
 import gui
 

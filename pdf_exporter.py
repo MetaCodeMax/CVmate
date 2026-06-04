@@ -7,6 +7,7 @@ from reportlab.pdfgen import canvas
 _MARGIN = 2 * cm
 _HEADER_FONT = ("Helvetica-Bold", 11)
 _BODY_FONT = ("Helvetica", 10)
+_BODY_BOLD_FONT = ("Helvetica-Bold", 10)
 _BODY_LEADING = 14
 _HEADER_SPACE_ABOVE = 10
 _HEADER_RULE_GAP = 5
@@ -22,21 +23,44 @@ def _is_header(line: str) -> bool:
     return bool(letters) and all(c.isupper() for c in letters)
 
 
-def _wrap(c, text, font_name, font_size, max_width):
-    words = text.split()
-    if not words:
-        return [""]
-    lines = []
-    current = words[0]
-    for word in words[1:]:
-        candidate = f"{current} {word}"
-        if c.stringWidth(candidate, font_name, font_size) <= max_width:
-            current = candidate
+def _strip_marks(text: str) -> str:
+    return text.replace("**", "")
+
+
+def _styled_words(text: str):
+    """Split a line into words; each word is a list of (substring, is_bold) runs.
+
+    Bold spans are wrapped in **...**. Punctuation that abuts a bold span stays glued
+    to it (no stray space) because splitting happens at real whitespace, not at marks.
+    """
+    styled_chars = []
+    for i, segment in enumerate(text.split("**")):
+        is_bold = i % 2 == 1
+        for ch in segment:
+            styled_chars.append((ch, is_bold))
+
+    words = []
+    current = []
+    for ch, is_bold in styled_chars:
+        if ch.isspace():
+            if current:
+                words.append(_group_runs(current))
+                current = []
         else:
-            lines.append(current)
-            current = word
-    lines.append(current)
-    return lines
+            current.append((ch, is_bold))
+    if current:
+        words.append(_group_runs(current))
+    return words
+
+
+def _group_runs(chars):
+    runs = []
+    for ch, is_bold in chars:
+        if runs and runs[-1][1] == is_bold:
+            runs[-1] = (runs[-1][0] + ch, is_bold)
+        else:
+            runs.append((ch, is_bold))
+    return runs
 
 
 def export_pdf(cv_text: str, output_path: str) -> None:
@@ -54,6 +78,50 @@ def export_pdf(cv_text: str, output_path: str) -> None:
                 c.showPage()
                 y = top
 
+        def draw_body(text):
+            nonlocal y
+            name, size = _BODY_FONT
+            bold_name = _BODY_BOLD_FONT[0]
+            space_w = c.stringWidth(" ", name, size)
+
+            def font_of(is_bold):
+                return bold_name if is_bold else name
+
+            def word_width(runs):
+                return sum(c.stringWidth(t, font_of(b), size) for t, b in runs)
+
+            words = _styled_words(text)
+            if not words:
+                return
+            line = []
+            line_w = 0
+
+            def flush():
+                nonlocal y, line, line_w
+                new_page_if_needed(_BODY_LEADING)
+                x = _MARGIN
+                for j, (runs, w) in enumerate(line):
+                    if j:
+                        x += space_w
+                    for t, b in runs:
+                        c.setFont(font_of(b), size)
+                        c.drawString(x, y, t)
+                        x += c.stringWidth(t, font_of(b), size)
+                y -= _BODY_LEADING
+                line = []
+                line_w = 0
+
+            for runs in words:
+                w = word_width(runs)
+                add = w if not line else space_w + w
+                if line and line_w + add > content_width:
+                    flush()
+                    add = w
+                line.append((runs, w))
+                line_w += add
+            if line:
+                flush()
+
         for raw_line in cv_text.splitlines():
             line = raw_line.rstrip()
 
@@ -65,17 +133,13 @@ def export_pdf(cv_text: str, output_path: str) -> None:
                 y -= _HEADER_SPACE_ABOVE
                 new_page_if_needed(_HEADER_FONT[1] + _HEADER_RULE_GAP + _HEADER_BODY_GAP)
                 c.setFont(*_HEADER_FONT)
-                c.drawString(_MARGIN, y, line.strip())
+                c.drawString(_MARGIN, y, _strip_marks(line.strip()))
                 y -= _HEADER_RULE_GAP
                 c.setLineWidth(0.75)
                 c.line(_MARGIN, y, _MARGIN + content_width, y)
                 y -= _HEADER_BODY_GAP
             else:
-                for wrapped in _wrap(c, line, _BODY_FONT[0], _BODY_FONT[1], content_width):
-                    new_page_if_needed(_BODY_LEADING)
-                    c.setFont(*_BODY_FONT)
-                    c.drawString(_MARGIN, y, wrapped)
-                    y -= _BODY_LEADING
+                draw_body(line)
 
         c.save()
     except (OSError, IOError) as e:

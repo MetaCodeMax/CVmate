@@ -3,6 +3,7 @@
 import os
 import queue
 import threading
+import webbrowser
 from datetime import datetime
 from tkinter import filedialog
 
@@ -10,8 +11,9 @@ import customtkinter as ctk
 
 import cv_parser
 import gemini_client
+import key_store
 import pdf_exporter
-from config import APP_TITLE, WINDOW_SIZE
+from config import AI_STUDIO_URL, APP_TITLE, WINDOW_SIZE
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -32,14 +34,24 @@ class App(ctk.CTk):
 
         self._build_layout()
         self.after(100, self._poll_result_queue)
+        self.after(200, self._ensure_api_key)
 
     def _build_layout(self):
         container = ctk.CTkFrame(self, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
 
+        header_row = ctk.CTkFrame(container, fg_color="transparent")
+        header_row.pack(fill="x")
         ctk.CTkLabel(
-            container, text=APP_TITLE, font=ctk.CTkFont(size=28, weight="bold")
-        ).pack(anchor="w")
+            header_row, text=APP_TITLE, font=ctk.CTkFont(size=28, weight="bold")
+        ).pack(side="left")
+        ctk.CTkButton(
+            header_row,
+            text="API Key",
+            width=80,
+            fg_color="gray30",
+            command=self._prompt_api_key,
+        ).pack(side="right")
 
         attach_row = ctk.CTkFrame(container, fg_color="transparent")
         attach_row.pack(fill="x", pady=(16, 8))
@@ -81,6 +93,96 @@ class App(ctk.CTk):
             text = text[:89] + "…"
         self.status_label.configure(text=f"Status: {text}")
 
+    def _ensure_api_key(self):
+        key = key_store.get_api_key()
+        if key:
+            gemini_client.configure(key)
+            self._set_status("Ready")
+        else:
+            self._prompt_api_key()
+
+    def _prompt_api_key(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Set up your Gemini API key")
+        dialog.geometry("540x380")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.after(250, dialog.grab_set)
+
+        frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=24, pady=24)
+
+        ctk.CTkLabel(
+            frame,
+            text="Connect your Gemini API key",
+            font=ctk.CTkFont(size=20, weight="bold"),
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            frame,
+            justify="left",
+            wraplength=480,
+            text=(
+                "CVmate uses Google Gemini to tailor your CV. A key is free.\n\n"
+                "1.  Click the button below to open Google AI Studio.\n"
+                '2.  Sign in, click "Create API key", and copy the key.\n'
+                "3.  Paste it here and click Save. It is stored only on this PC."
+            ),
+        ).pack(anchor="w", pady=(8, 12))
+
+        ctk.CTkButton(
+            frame,
+            text="Open Google AI Studio  ↗",
+            command=lambda: webbrowser.open(AI_STUDIO_URL),
+        ).pack(fill="x")
+
+        entry = ctk.CTkEntry(frame, placeholder_text="Paste your API key here")
+        entry.pack(fill="x", pady=(16, 6))
+
+        status = ctk.CTkLabel(frame, text="", text_color="gray70", anchor="w")
+        status.pack(fill="x")
+
+        save_btn = ctk.CTkButton(frame, text="Save & Continue")
+        save_btn.pack(fill="x", pady=(12, 0))
+
+        result_q = queue.Queue()
+
+        def poll():
+            try:
+                key, ok = result_q.get_nowait()
+            except queue.Empty:
+                dialog.after(100, poll)
+                return
+            if ok:
+                key_store.save_api_key(key)
+                gemini_client.configure(key)
+                dialog.destroy()
+                self._set_status("API key saved. Ready to tailor your CV.")
+            else:
+                save_btn.configure(state="normal", text="Save & Continue")
+                status.configure(
+                    text="That key didn't work — check it and try again.",
+                    text_color="#e06666",
+                )
+
+        def on_save():
+            key = entry.get().strip()
+            if not key:
+                status.configure(
+                    text="Please paste your API key.", text_color="#e06666"
+                )
+                return
+            save_btn.configure(state="disabled", text="Checking…")
+            status.configure(text="Validating key…", text_color="gray70")
+            threading.Thread(
+                target=lambda: result_q.put((key, gemini_client.validate_api_key(key))),
+                daemon=True,
+            ).start()
+            dialog.after(100, poll)
+
+        save_btn.configure(command=on_save)
+        entry.bind("<Return>", lambda _e: on_save())
+        entry.focus()
+
     def _reset_generation(self):
         self.tailored_cv_text = ""
         self.download_button.configure(state="disabled", fg_color="gray30")
@@ -115,6 +217,10 @@ class App(ctk.CTk):
         job_desc = self.job_textbox.get("1.0", "end").strip()
         if not job_desc:
             self._set_status("Please paste the job description.")
+            return
+        if not gemini_client.is_configured():
+            self._set_status("Set your Gemini API key to continue.")
+            self._prompt_api_key()
             return
 
         self.generate_button.configure(state="disabled", text="Generating…")

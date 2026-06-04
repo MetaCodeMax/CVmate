@@ -49,10 +49,13 @@ Save the tailored CV anywhere; the status bar confirms the path.
 
 A clean, single-column A4 PDF. Compare it to the source:
 
-- The **summary** now leads with *Python* (the source listed Java first).
+- The **summary** is rewritten to target the exact role and leads with *Python* and backend.
 - **Experience** bullets are reordered to surface Python scripting and mentoring — both
-  called out in the job description — ahead of the Java/monolith work.
-- **Skills** lead with *Python, Docker, SQL, React* (the job's keywords).
+  called out in the job description — ahead of the Java/monolith work, each rewritten to
+  open with a strong action verb.
+- **Skills** lead with *Python, SQL, Docker, React* (the job's keywords).
+- Phrases that are **both** in the CV **and** a job requirement are rendered in **bold**, so the
+  match is visible at a glance.
 - Nothing was added. Every line traces back to the original CV.
 
 ![Output PDF](07_output_pdf.png)
